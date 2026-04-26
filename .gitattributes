@@ -1,0 +1,15 @@
+# Generated SDKs (openapi-python-client output)
+tool/harness-code-api-client/** linguist-generated=true
+tool/harness-pipeline-api-client/** linguist-generated=true
+tool/harness-platform-api-client/** linguist-generated=true
+
+# Auto-generated CLI command groups (from tool/harness-cli/generate.py)
+tool/harness-cli/harness_cli/main.py linguist-generated=true
+tool/harness-cli/harness_cli/commands/** linguist-generated=true
+
+# ...except the hand-written custom commands
+tool/harness-cli/harness_cli/commands/logs.py linguist-generated=false
+tool/harness-cli/harness_cli/commands/run.py linguist-generated=false
+
+# Pre-built wheels
+tool/wheels/** linguist-generated=true
