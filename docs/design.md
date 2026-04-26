@@ -761,11 +761,11 @@ This is significant automation to build — it requires a bot that creates synth
 
 ```
                          ┌─────────────────────────────────────────┐
-                         │                  main                    │
-                         │  (permanent, production record)          │
-                         │                                          │
-                         │  ...──● 0.11.0 ──● 0.12.0 ──● 0.13.0── │
-                         └────────────────────────────────┬─────────┘
+                         │                  main                   │
+                         │  (permanent, production record)         │
+                         │                                         │
+                         │  ...──● 0.11.0 ──● 0.12.0 ──● 0.13.0──  │
+                         └────────────────────────────────┬────────┘
                                                           │
                                     ┌─────────────────────┘
                                     │ auto-created from main tag
@@ -789,26 +789,26 @@ This is significant automation to build — it requires a bot that creates synth
                          │  ● 0.13.0     │
                          └───────────────┘
 
-         ┌───────────────────────────────────────────────────┐
-         │                 dev/* branches                    │
-         │              (ephemeral, per feature)             │
-         │                                                   │
+         ┌──────────────────────────────────────────────────┐
+         │                 dev/* branches                   │
+         │              (ephemeral, per feature)            │
+         │                                                  │
          │  dev/feat-1  ──────────────────────────┐         │
          │   VERSION: 0.12.1-rc.0                 │ merge   │
          │   Build + short tests                  ▼         │
-         │                                                   │
+         │                                                  │
          │  dev/feat-2  ──────────────────────────┐         │
          │   VERSION: 0.12.1-rc.1                 │ merge   │
          │                                        ▼         │
-         └───────────────────────────────────────────────────┘
+         └──────────────────────────────────────────────────┘
 
          ┌───────────────────────────────────────────────────┐
          │                 ops/* branches                    │
          │           (operational automation)                │
          │                                                   │
-         │  ops/gc-2026-04-12  ── GC run (nightly)          │
-         │  ops/fix-deploy     ── pipeline maintenance      │
-         │                        (merges to main directly) │
+         │  ops/gc-2026-04-12  ── GC run (nightly)           │
+         │  ops/fix-deploy     ── pipeline maintenance       │
+         │                        (merges to main directly)  │
          └───────────────────────────────────────────────────┘
 ```
 
@@ -863,8 +863,8 @@ This is significant automation to build — it requires a bot that creates synth
   stg VERSION = rc.4                    ┌────────────────────┐
                                         │  GIT CONFLICT      │
                                         │                    │
-                                        │  stg says: rc.4   │
-                                        │  you say:  rc.4   │
+                                        │  stg says: rc.4    │
+                                        │  you say:  rc.4    │
                                         │                    │
                                         │  Rebase and        │
                                         │  bump to rc.5      │
@@ -936,7 +936,7 @@ This is significant automation to build — it requires a bot that creates synth
        ▼
   ┌─────────────────────────────────────────────────┐
   │                                                 │
-  │  stg-0.12.1  ←── created from main tag 0.12.0  │
+  │  stg-0.12.1  ←── created from main tag 0.12.0   │
   │  VERSION = 0.12.0                               │
   │                                                 │
   │  dev/hotfix-critical-bug                        │
@@ -976,7 +976,7 @@ This is significant automation to build — it requires a bot that creates synth
   │  QEMU/KVM on local builder                                      │
   │  16 AMIs built                                                  │
   │  Short tests ✓                                                  │
-  │  Artifact: ami-0001..ami-0016, tagged tested, 0.12.1-rc.0      │
+  │  Artifact: ami-0001..ami-0016, tagged tested, 0.12.1-rc.0       │
   └────────────────────────────┬────────────────────────────────────┘
                                │ same artifact, never rebuilt
                                ▼
