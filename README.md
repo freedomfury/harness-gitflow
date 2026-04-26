@@ -23,7 +23,7 @@ Two things remain unfinished and are flagged below.
                                  │  ●─0.10.0─●─0.11.0─●─0.12.0──  │
                                  └─────┬─────────────────┬────────┘
                                        │                 │
-                  auto-created from main│                │ ops/* merge
+                auto-created from main │                 │ ops/* merge
                                        ▼                 │ (human gate)
                 ┌──────────────────────────────────┐     │
                 │           stg-X.Y.Z              │     │
