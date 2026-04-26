@@ -1,0 +1,9 @@
+# Source this file to set up the Harness POC environment:
+#   source activate
+#
+# Sets up:
+#   - Python venv (harness-cli, both SDKs)
+#   - Credentials (POC_HARNESS_API_KEY, POC_HARNESS_ACCOUNT_ID, MINIO_*)
+
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/.venv/bin/activate"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/exports"

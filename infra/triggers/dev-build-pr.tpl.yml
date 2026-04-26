@@ -1,0 +1,43 @@
+trigger:
+  name: dev PR
+  identifier: dev_build_pr
+  enabled: true
+  orgIdentifier: ${org_id}
+  projectIdentifier: ${project_id}
+  pipelineIdentifier: dev_build
+  source:
+    type: Webhook
+    spec:
+      type: Harness
+      spec:
+        type: PullRequest
+        spec:
+          connectorRef: ""
+          autoAbortPreviousExecutions: true
+          payloadConditions:
+            - key: sourceBranch
+              operator: StartsWith
+              value: "dev/"
+          headerConditions: []
+          repoName: image-build
+          actions:
+            - Create
+            - Reopen
+            - Update
+  inputYaml: |
+    pipeline:
+      identifier: dev_build
+      variables:
+        - name: pr_event
+          type: String
+          value: "pull_request"
+        - name: pr_target_branch
+          type: String
+          value: <+trigger.targetBranch>
+      properties:
+        ci:
+          codebase:
+            build:
+              type: branch
+              spec:
+                branch: <+trigger.sourceBranch>

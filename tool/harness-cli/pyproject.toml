@@ -1,0 +1,20 @@
+[project]
+name = "harness-cli"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1,<9",
+    "api-specification-client",
+    "pipeline-service-api-reference-client",
+    "jq",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-mock>=3.14"]
+
+[project.scripts]
+harness-cli = "harness_cli.main:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

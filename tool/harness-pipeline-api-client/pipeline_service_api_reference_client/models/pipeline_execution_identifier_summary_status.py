@@ -1,0 +1,81 @@
+from typing import Literal, cast
+
+PipelineExecutionIdentifierSummaryStatus = Literal[
+    "Aborted",
+    "AbortedByFreeze",
+    "APPROVAL_REJECTED",
+    "APPROVAL_WAITING",
+    "ApprovalRejected",
+    "ApprovalWaiting",
+    "AsyncWaiting",
+    "Discontinuing",
+    "Errored",
+    "Expired",
+    "Failed",
+    "IgnoreFailed",
+    "InputWaiting",
+    "INTERVENTION_WAITING",
+    "InterventionWaiting",
+    "NOT_STARTED",
+    "NotStarted",
+    "Paused",
+    "Pausing",
+    "Queued",
+    "QueuedExecutionConcurrencyReached",
+    "QueuedGlobalInfraCapacityReached",
+    "QueuedLicenseLimitReached",
+    "ResourceWaiting",
+    "Running",
+    "Skipped",
+    "Success",
+    "Suspended",
+    "TaskWaiting",
+    "TimedWaiting",
+    "UploadWaiting",
+    "Waiting",
+    "WaitStepRunning",
+]
+
+PIPELINE_EXECUTION_IDENTIFIER_SUMMARY_STATUS_VALUES: set[PipelineExecutionIdentifierSummaryStatus] = {
+    "Aborted",
+    "AbortedByFreeze",
+    "APPROVAL_REJECTED",
+    "APPROVAL_WAITING",
+    "ApprovalRejected",
+    "ApprovalWaiting",
+    "AsyncWaiting",
+    "Discontinuing",
+    "Errored",
+    "Expired",
+    "Failed",
+    "IgnoreFailed",
+    "InputWaiting",
+    "INTERVENTION_WAITING",
+    "InterventionWaiting",
+    "NOT_STARTED",
+    "NotStarted",
+    "Paused",
+    "Pausing",
+    "Queued",
+    "QueuedExecutionConcurrencyReached",
+    "QueuedGlobalInfraCapacityReached",
+    "QueuedLicenseLimitReached",
+    "ResourceWaiting",
+    "Running",
+    "Skipped",
+    "Success",
+    "Suspended",
+    "TaskWaiting",
+    "TimedWaiting",
+    "UploadWaiting",
+    "Waiting",
+    "WaitStepRunning",
+}
+
+
+def check_pipeline_execution_identifier_summary_status(value: str) -> PipelineExecutionIdentifierSummaryStatus:
+    if value in PIPELINE_EXECUTION_IDENTIFIER_SUMMARY_STATUS_VALUES:
+        return cast(PipelineExecutionIdentifierSummaryStatus, value)
+    raise TypeError(
+        f"Unexpected value {value!r}. Expected one of {PIPELINE_EXECUTION_IDENTIFIER_SUMMARY_STATUS_VALUES!r}"
+    )

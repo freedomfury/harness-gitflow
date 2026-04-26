@@ -1,0 +1,73 @@
+from typing import Literal, cast
+
+ProjectModulesItem = Literal[
+    "AARP",
+    "AASP",
+    "AAST",
+    "AI_AGENT_MLOPS",
+    "AI_TEST_AUTOMATION",
+    "AISRE",
+    "CD",
+    "CE",
+    "CET",
+    "CF",
+    "CHAOS",
+    "CI",
+    "CODE",
+    "CORE",
+    "CV",
+    "DBOPS",
+    "DevopsEssentials",
+    "FME",
+    "GOVERNANCE",
+    "HAR",
+    "IACM",
+    "IDP",
+    "PLATFORM",
+    "PMS",
+    "RMG",
+    "SEI",
+    "SRM",
+    "SSCA",
+    "STO",
+    "TEMPLATESERVICE",
+]
+
+PROJECT_MODULES_ITEM_VALUES: set[ProjectModulesItem] = {
+    "AARP",
+    "AASP",
+    "AAST",
+    "AI_AGENT_MLOPS",
+    "AI_TEST_AUTOMATION",
+    "AISRE",
+    "CD",
+    "CE",
+    "CET",
+    "CF",
+    "CHAOS",
+    "CI",
+    "CODE",
+    "CORE",
+    "CV",
+    "DBOPS",
+    "DevopsEssentials",
+    "FME",
+    "GOVERNANCE",
+    "HAR",
+    "IACM",
+    "IDP",
+    "PLATFORM",
+    "PMS",
+    "RMG",
+    "SEI",
+    "SRM",
+    "SSCA",
+    "STO",
+    "TEMPLATESERVICE",
+}
+
+
+def check_project_modules_item(value: str) -> ProjectModulesItem:
+    if value in PROJECT_MODULES_ITEM_VALUES:
+        return cast(ProjectModulesItem, value)
+    raise TypeError(f"Unexpected value {value!r}. Expected one of {PROJECT_MODULES_ITEM_VALUES!r}")

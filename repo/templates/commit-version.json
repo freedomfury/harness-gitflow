@@ -1,0 +1,12 @@
+{
+  "actions": [
+    {
+      "action": "UPDATE",
+      "path": "VERSION",
+      "payload": "$RELEASE_VERSION",
+      "encoding": "utf8"
+    }
+  ],
+  "branch": "$NEXT_STG",
+  "message": "init: set VERSION to $RELEASE_VERSION for $NEXT_STG"
+}

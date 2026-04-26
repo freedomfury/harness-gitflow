@@ -1,0 +1,33 @@
+trigger:
+  name: stg push
+  identifier: stg_merge_push
+  enabled: true
+  orgIdentifier: ${org_id}
+  projectIdentifier: ${project_id}
+  pipelineIdentifier: stg_merge
+  source:
+    type: Webhook
+    spec:
+      type: Harness
+      spec:
+        type: Push
+        spec:
+          connectorRef: ""
+          autoAbortPreviousExecutions: true
+          payloadConditions:
+            - key: targetBranch
+              operator: StartsWith
+              value: "stg-"
+          headerConditions: []
+          repoName: image-build
+          actions: []
+  inputYaml: |
+    pipeline:
+      identifier: stg_merge
+      properties:
+        ci:
+          codebase:
+            build:
+              type: branch
+              spec:
+                branch: <+trigger.branch>

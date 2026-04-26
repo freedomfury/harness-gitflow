@@ -1,0 +1,81 @@
+from typing import Literal, cast
+
+AsyncChainExecutableResponseOrBuilderStatus = Literal[
+    "ABORTED",
+    "APPROVAL_REJECTED",
+    "APPROVAL_WAITING",
+    "ASYNC_WAITING",
+    "DISCONTINUING",
+    "ERRORED",
+    "EXPIRED",
+    "FAILED",
+    "FREEZE_FAILED",
+    "IGNORE_FAILED",
+    "INPUT_WAITING",
+    "INTERVENTION_WAITING",
+    "NO_OP",
+    "PAUSED",
+    "PAUSING",
+    "QUEUED",
+    "QUEUED_EXECUTION_CONCURRENCY_REACHED",
+    "QUEUED_GLOBAL_INFRA_CAPACITY_REACHED",
+    "QUEUED_LICENSE_LIMIT_REACHED",
+    "QUEUED_PLAN_CREATION",
+    "QUEUED_STEP_LIMIT_REACHED",
+    "RESOURCE_WAITING",
+    "RUNNING",
+    "SKIPPED",
+    "STARTING_PLAN_CREATION",
+    "STARTING_QUEUED_STEP",
+    "SUCCEEDED",
+    "SUSPENDED",
+    "TASK_WAITING",
+    "TIMED_WAITING",
+    "UNRECOGNIZED",
+    "UPLOAD_WAITING",
+    "WAIT_STEP_RUNNING",
+]
+
+ASYNC_CHAIN_EXECUTABLE_RESPONSE_OR_BUILDER_STATUS_VALUES: set[AsyncChainExecutableResponseOrBuilderStatus] = {
+    "ABORTED",
+    "APPROVAL_REJECTED",
+    "APPROVAL_WAITING",
+    "ASYNC_WAITING",
+    "DISCONTINUING",
+    "ERRORED",
+    "EXPIRED",
+    "FAILED",
+    "FREEZE_FAILED",
+    "IGNORE_FAILED",
+    "INPUT_WAITING",
+    "INTERVENTION_WAITING",
+    "NO_OP",
+    "PAUSED",
+    "PAUSING",
+    "QUEUED",
+    "QUEUED_EXECUTION_CONCURRENCY_REACHED",
+    "QUEUED_GLOBAL_INFRA_CAPACITY_REACHED",
+    "QUEUED_LICENSE_LIMIT_REACHED",
+    "QUEUED_PLAN_CREATION",
+    "QUEUED_STEP_LIMIT_REACHED",
+    "RESOURCE_WAITING",
+    "RUNNING",
+    "SKIPPED",
+    "STARTING_PLAN_CREATION",
+    "STARTING_QUEUED_STEP",
+    "SUCCEEDED",
+    "SUSPENDED",
+    "TASK_WAITING",
+    "TIMED_WAITING",
+    "UNRECOGNIZED",
+    "UPLOAD_WAITING",
+    "WAIT_STEP_RUNNING",
+}
+
+
+def check_async_chain_executable_response_or_builder_status(value: str) -> AsyncChainExecutableResponseOrBuilderStatus:
+    if value in ASYNC_CHAIN_EXECUTABLE_RESPONSE_OR_BUILDER_STATUS_VALUES:
+        return cast(AsyncChainExecutableResponseOrBuilderStatus, value)
+    raise TypeError(
+        f"Unexpected value {value!r}. Expected one of {ASYNC_CHAIN_EXECUTABLE_RESPONSE_OR_BUILDER_STATUS_VALUES!r}"
+    )

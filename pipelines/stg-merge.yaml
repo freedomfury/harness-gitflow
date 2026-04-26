@@ -1,0 +1,205 @@
+pipeline:
+  name: stg merge
+  identifier: stg_merge
+  orgIdentifier: default
+  projectIdentifier: image_flow
+  stages:
+    - stage:
+        name: promote
+        identifier: promote
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: version change check
+                  identifier: version_change_check
+                  spec:
+                    connectorRef: Docker
+                    image: freedomfury/imageflow:latest
+                    imagePullPolicy: Always
+                    shell: Bash
+                    command: |-
+                      BRANCH="$DRONE_SOURCE_BRANCH"
+                      echo "branch: $BRANCH"
+
+                      BEFORE="$DRONE_COMMIT_BEFORE"
+                      echo "DRONE_COMMIT_BEFORE: $BEFORE"
+                      if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+                        echo "notice: branch just created — nothing to promote yet"
+                        echo "skip" > build.env
+                        exit 0
+                      fi
+
+                      CHANGED=$(git diff --name-only "$BEFORE" HEAD 2>/dev/null)
+                      echo "changed files since $BEFORE:"
+                      echo "$CHANGED"
+
+                      NON_VERSION=$(echo "$CHANGED" | grep -v '^VERSION$' | grep -v '^$' | wc -l)
+
+                      if [ "$NON_VERSION" -eq 0 ]; then
+                        echo "true" > build.env
+                        echo "result: VERSION-only change"
+                      else
+                        echo "false" > build.env
+                        echo "result: code change ($NON_VERSION non-VERSION files)"
+                      fi
+
+              - step:
+                  type: Run
+                  name: mock long tests
+                  identifier: mock_long_tests
+                  spec:
+                    connectorRef: Docker
+                    image: freedomfury/imageflow:latest
+                    imagePullPolicy: Always
+                    shell: Bash
+                    envVariables:
+                      MINIO_URL: <+secrets.getValue("minio_url")>
+                      MINIO_USER: <+secrets.getValue("minio_user")>
+                      MINIO_PASS: <+secrets.getValue("minio_pass")>
+                    command: |-
+                      BUILD_ENV=$(cat build.env)
+                      VERSION=$(cat VERSION)
+                      BRANCH="$DRONE_SOURCE_BRANCH"
+
+                      if [ "$BUILD_ENV" = "skip" ]; then
+                        echo "notice: branch has no dev commits — nothing to promote"
+                        exit 0
+                      fi
+
+                      VERSION_ONLY="$BUILD_ENV"
+
+                      mc alias set minio "$MINIO_URL" "$MINIO_USER" "$MINIO_PASS" --quiet
+
+                      if [ "$VERSION_ONLY" = "true" ]; then
+                        echo "long tests: VERSION-only change — skipping"
+                      else
+                        echo "long tests: running integration suite (mock)"
+                        sleep 2
+                        echo "long tests: all passed"
+                      fi
+
+                      echo "artifact-stub: $VERSION @ $BRANCH" > artifact.stub
+                      echo "pushing: minio/global/harness/staging/$BRANCH/artifact.stub"
+                      mc cp artifact.stub "minio/global/harness/staging/$BRANCH/artifact.stub"
+                      MC_EXIT=$?
+                      echo "mc cp exit: $MC_EXIT"
+                      if [ "$MC_EXIT" -ne 0 ]; then
+                        echo "ERROR: mc cp failed"
+                        exit 1
+                      fi
+                      mc ls "minio/global/harness/staging/$BRANCH/artifact.stub" || { echo "ERROR: artifact not found after copy"; exit 1; }
+                      echo "promoted: $VERSION @ $BRANCH → staging"
+
+              - step:
+                  type: Run
+                  name: bump version
+                  identifier: bump_version
+                  spec:
+                    connectorRef: Docker
+                    image: freedomfury/imageflow:latest
+                    imagePullPolicy: Always
+                    shell: Bash
+                    envVariables:
+                      POC_HARNESS_API_KEY: <+secrets.getValue("code_api_key")>
+                      POC_HARNESS_ACCOUNT_ID: <+account.identifier>
+                      POC_HARNESS_ORG_ID: <+org.identifier>
+                      POC_HARNESS_PROJECT_ID: <+project.identifier>
+                      EXEC_ID: <+pipeline.executionId>
+                    command: |-
+                      set -euo pipefail
+                      BRANCH="$DRONE_SOURCE_BRANCH"
+                      BUILD_ENV=$(cat build.env)
+
+                      # Self-terminating: skip if this is a VERSION-only or empty push
+                      if [ "$BUILD_ENV" = "skip" ] || [ "$BUILD_ENV" = "true" ]; then
+                        echo "bump: VERSION-only or empty push — skipping"
+                        exit 0
+                      fi
+
+                      LOCK_IDENT="version_lock"
+                      LOCK_NAME="version.lock"
+                      LOCK_FOLDER="stg"
+                      LOCK_PAYLOAD="{\"exec_id\":\"$EXEC_ID\",\"ts\":$(date +%s)}"
+
+                      acquire_lock() {
+                        for attempt in 1 2 3 4 5; do
+                          if harness-cli ng-file-store create "$LOCK_IDENT" \
+                              --name "$LOCK_NAME" \
+                              --type FILE \
+                              --parent-identifier "$LOCK_FOLDER" \
+                              --content "$LOCK_PAYLOAD" 2>/tmp/lock.err; then
+                            echo "bump: lock acquired on attempt $attempt"
+                            return 0
+                          fi
+
+                          # Check for stale lock (held > 10 min)
+                          LOCK_CONTENT=$(harness-cli ng-file-store download-file "$LOCK_IDENT" 2>/dev/null || echo "{}")
+                          LOCK_TS=$(echo "$LOCK_CONTENT" | python3 -c \
+                            "import json,sys; d=json.load(sys.stdin); print(d.get('ts',0))" 2>/dev/null || echo 0)
+                          NOW=$(date +%s)
+                          AGE=$((NOW - LOCK_TS))
+                          if [ "$AGE" -gt 600 ]; then
+                            echo "bump: stale lock detected (age ${AGE}s > 600s) — force-deleting"
+                            harness-cli ng-file-store delete-file "$LOCK_IDENT" 2>/dev/null || true
+                            continue
+                          fi
+
+                          BACKOFF=$((2**attempt))
+                          echo "bump: lock held (age ${AGE}s), retry in ${BACKOFF}s (attempt $attempt/5)"
+                          sleep "$BACKOFF"
+                        done
+                        echo "bump: failed to acquire lock after 5 attempts"
+                        return 1
+                      }
+
+                      release_lock() {
+                        harness-cli ng-file-store delete-file "$LOCK_IDENT" > /dev/null 2>&1 || true
+                        echo "bump: lock released"
+                      }
+
+                      trap 'release_lock' EXIT
+
+                      acquire_lock
+
+                      CURRENT=$(harness-cli repos get-raw image-build VERSION --git-ref "$BRANCH")
+                      echo "bump: current stg VERSION = $CURRENT"
+
+                      NEXT_EXIT=0
+                      NEXT=$(python3 scripts/next-version.py "$CURRENT" "$BRANCH") || NEXT_EXIT=$?
+                      if [ "$NEXT_EXIT" -eq 2 ]; then
+                        echo "bump: $NEXT — leaving VERSION untouched"
+                        exit 0
+                      fi
+                      echo "bump: next = $NEXT"
+
+                      harness-cli repos commit-files image-build --body "$(cat <<EOF
+                      {
+                        "actions": [{
+                          "action": "UPDATE",
+                          "path": "VERSION",
+                          "payload": "$NEXT\n",
+                          "encoding": "utf8"
+                        }],
+                        "branch": "$BRANCH",
+                        "message": "bump: VERSION → $NEXT [exec:$EXEC_ID]"
+                      }
+                      EOF
+                      )"
+
+  delegateSelectors:
+    - image-flow-delegate
+  properties:
+    ci:
+      codebase:
+        repoName: image-build
+        build: <+input>

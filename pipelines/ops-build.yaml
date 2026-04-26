@@ -1,0 +1,84 @@
+pipeline:
+  name: ops build
+  identifier: ops_build
+  orgIdentifier: default
+  projectIdentifier: image_flow
+  stages:
+    - stage:
+        name: ops
+        identifier: ops
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: branch check
+                  identifier: branch_check
+                  spec:
+                    connectorRef: Docker
+                    image: ubuntu:resolute
+                    imagePullPolicy: IfNotPresent
+                    shell: Bash
+                    command: |-
+                      BRANCH="$DRONE_SOURCE_BRANCH"
+
+                      case "$BRANCH" in
+                        ops/*)
+                          echo "branch: $BRANCH — OK"
+                          ;;
+                        *)
+                          echo "ERROR: ops_build only runs on ops/* branches"
+                          echo "  expected: ops/*"
+                          echo "  got:      $BRANCH"
+                          exit 1
+                          ;;
+                      esac
+
+              - step:
+                  type: Run
+                  name: code check
+                  identifier: code_check
+                  spec:
+                    connectorRef: Docker
+                    image: freedomfury/imageflow:latest
+                    imagePullPolicy: IfNotPresent
+                    shell: Bash
+                    command: |-
+                      BRANCH="$DRONE_SOURCE_BRANCH"
+                      echo "code check: $BRANCH"
+
+                      git fetch origin main --depth=1 2>/dev/null || true
+                      CHANGED=$(git diff --name-only origin/main...HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+
+                      echo "changed files:"
+                      echo "$CHANGED"
+
+                      # Image code paths — ops/* must not touch these
+                      VIOLATIONS=$(echo "$CHANGED" | grep -E '^(VERSION|scripts/)' || true)
+
+                      if [ -n "$VIOLATIONS" ]; then
+                        echo "ERROR: ops/* branches must not change image code"
+                        echo "  blocked files:"
+                        echo "$VIOLATIONS" | while read -r f; do echo "    - $f"; done
+                        echo "  image code: VERSION, scripts/"
+                        echo "  allowed: tool/, pipeline configs, documentation"
+                        exit 1
+                      fi
+
+                      echo "code check: no image code detected — OK"
+
+  delegateSelectors:
+    - image-flow-delegate
+  properties:
+    ci:
+      codebase:
+        repoName: image-build
+        build: <+input>

@@ -1,0 +1,164 @@
+pipeline:
+  name: main release
+  identifier: main_release
+  orgIdentifier: default
+  projectIdentifier: image_flow
+  stages:
+    - stage:
+        name: release
+        identifier: release
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: read version
+                  identifier: read_version
+                  spec:
+                    connectorRef: Docker
+                    image: freedomfury/imageflow:latest
+                    imagePullPolicy: Always
+                    shell: Bash
+                    outputVariables:
+                      - name: RELEASE_VERSION
+                      - name: NEXT_VERSION
+                      - name: NEXT_STG
+                    command: |-
+                      VERSION=$(cat VERSION)
+                      echo "releasing: $VERSION"
+                      echo "commit: $DRONE_COMMIT_SHA"
+
+                      if echo "$VERSION" | grep -q '-'; then
+                        echo "ERROR: VERSION $VERSION is a pre-release."
+                        echo "  The sprint must reach its target version before releasing to main."
+                        echo "  Run scripts/bump-version.sh to advance VERSION to the sprint target."
+                        exit 1
+                      fi
+
+                      MAJOR=$(echo "$VERSION" | cut -d. -f1)
+                      MINOR=$(echo "$VERSION" | cut -d. -f2)
+
+                      NEXT_MINOR=$((MINOR + 1))
+                      NEXT_VERSION="${MAJOR}.${NEXT_MINOR}.0"
+                      NEXT_STG="stg-${NEXT_VERSION}"
+
+                      echo "next sprint: $NEXT_STG"
+
+                      export RELEASE_VERSION="$VERSION"
+                      export NEXT_VERSION
+                      export NEXT_STG
+
+              - step:
+                  type: Run
+                  name: tag release artifact
+                  identifier: tag_release_artifact
+                  spec:
+                    connectorRef: Docker
+                    image: freedomfury/imageflow:latest
+                    imagePullPolicy: Always
+                    shell: Bash
+                    envVariables:
+                      MINIO_URL: <+secrets.getValue("minio_url")>
+                      MINIO_USER: <+secrets.getValue("minio_user")>
+                      MINIO_PASS: <+secrets.getValue("minio_pass")>
+                    command: |-
+                      RELEASE_VERSION="<+steps.read_version.output.outputVariables.RELEASE_VERSION>"
+
+                      mc alias set minio "$MINIO_URL" "$MINIO_USER" "$MINIO_PASS" --quiet
+
+                      STG_BRANCH="stg-$RELEASE_VERSION"
+                      STAGING_PATH="global/harness/staging/$STG_BRANCH/artifact.stub"
+                      RELEASE_PATH="global/harness/releases/$RELEASE_VERSION/artifact.stub"
+
+                      if mc ls "minio/$STAGING_PATH" > /dev/null 2>&1; then
+                        mc cp "minio/$STAGING_PATH" "minio/$RELEASE_PATH"
+                        echo "released: $RELEASE_VERSION promoted from $STG_BRANCH"
+                      else
+                        echo "WARNING: staging artifact not found — creating release stub"
+                        echo "artifact-stub: $RELEASE_VERSION" > artifact.stub
+                        mc cp artifact.stub "minio/$RELEASE_PATH"
+                        echo "released: $RELEASE_VERSION (stub)"
+                      fi
+                      echo "artifact: $MINIO_URL/$RELEASE_PATH"
+
+              - step:
+                  type: Run
+                  name: close sprint
+                  identifier: close_sprint
+                  spec:
+                    connectorRef: Docker
+                    image: freedomfury/imageflow:latest
+                    imagePullPolicy: Always
+                    shell: Bash
+                    envVariables:
+                      POC_HARNESS_API_KEY: <+secrets.getValue("code_api_key")>
+                      POC_HARNESS_ACCOUNT_ID: <+account.identifier>
+                    command: |-
+                      NEXT_STG="<+steps.read_version.output.outputVariables.NEXT_STG>"
+                      RELEASE_VERSION="<+steps.read_version.output.outputVariables.RELEASE_VERSION>"
+                      RULE_ID="protect_$(echo "$NEXT_STG" | tr -- '-.' '_')"
+
+                      echo "=== Creating branch $NEXT_STG ==="
+                      harness-cli repos create-branch image-build --body "$(cat <<EOF
+                      {"name": "$NEXT_STG", "target": "main"}
+                      EOF
+                      )"
+
+                      echo "=== Setting VERSION to $RELEASE_VERSION in $NEXT_STG ==="
+                      RESULT=$(harness-cli repos commit-files image-build --body "$(cat <<EOF
+                      {
+                        "actions": [{
+                          "action": "UPDATE",
+                          "path": "VERSION",
+                          "payload": "$RELEASE_VERSION\n",
+                          "encoding": "utf8"
+                        }],
+                        "branch": "$NEXT_STG",
+                        "message": "init: set VERSION to $RELEASE_VERSION for $NEXT_STG"
+                      }
+                      EOF
+                      )" 2>&1) || true
+                      if echo "$RESULT" | grep -q "No effective changes"; then
+                        echo "VERSION already $RELEASE_VERSION in $NEXT_STG — skipping"
+                      else
+                        echo "$RESULT"
+                      fi
+
+                      echo "=== Creating branch rule $RULE_ID ==="
+                      harness-cli rules repo-rule-add image-build --body "$(cat <<EOF
+                      {
+                        "identifier": "$RULE_ID",
+                        "type": "branch",
+                        "state": "active",
+                        "pattern": {"include": ["$NEXT_STG"]},
+                        "definition": {
+                          "bypass": {"repo_owners": true},
+                          "pullreq": {
+                            "approvals": {"require_minimum_count": 1},
+                            "comments": {},
+                            "status_checks": {"require_uids": ["dev_build-validate"]},
+                            "merge": {},
+                            "reviewers": {}
+                          }
+                        }
+                      }
+                      EOF
+                      )"
+
+                      echo "=== Sprint closed ==="
+
+  delegateSelectors:
+    - image-flow-delegate
+  properties:
+    ci:
+      codebase:
+        repoName: image-build
+        build: <+input>

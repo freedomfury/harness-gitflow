@@ -1,0 +1,246 @@
+<mxfile host="app.diagrams.net" modified="2026-04-15" version="24.0.0">
+  <diagram id="harness-poc-architecture" name="Harness CI/CD Architecture">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- TITLE                                           -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="title" value="Harness CI/CD — Golden Image Build Pipeline (POC)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="20" width="900" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- SECTION A: Harness Code (Git Repository)        -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="git-container" value="Harness Code Repository (Git)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="90" width="590" height="450" as="geometry" />
+        </mxCell>
+
+        <!-- Developer -->
+        <mxCell id="developer" value="Developer" style="shape=mxgraph.general.person;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontStyle=1;fontSize=11;" vertex="1" parent="git-container">
+          <mxGeometry x="245" y="45" width="50" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- dev/* branches -->
+        <mxCell id="dev-branch" value="&lt;b&gt;dev/*&lt;/b&gt;&lt;br/&gt;Feature Branches&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Ephemeral per feature&lt;br/&gt;Branched from stg-*&lt;br/&gt;All image builds happen here&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="git-container">
+          <mxGeometry x="20" y="160" width="170" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- stg-X.Y.Z branch -->
+        <mxCell id="stg-branch" value="&lt;b&gt;stg-X.Y.Z&lt;/b&gt;&lt;br/&gt;Versioned Staging&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Ephemeral per sprint&lt;br/&gt;One per release cycle&lt;br/&gt;Runs long integration tests&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="git-container">
+          <mxGeometry x="210" y="160" width="170" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- main branch -->
+        <mxCell id="main-branch" value="&lt;b&gt;main&lt;/b&gt;&lt;br/&gt;Production Record&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Permanent&lt;br/&gt;Every commit is a tagged release&lt;br/&gt;or an ops merge&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="git-container">
+          <mxGeometry x="400" y="160" width="170" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- ops/* branches -->
+        <mxCell id="ops-branch" value="&lt;b&gt;ops/*&lt;/b&gt;&lt;br/&gt;Operational Branches&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Pipeline maintenance&lt;br/&gt;+ nightly automation&lt;br/&gt;No image builds&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="git-container">
+          <mxGeometry x="400" y="300" width="170" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- Developer pushes to dev/* -->
+        <mxCell id="dev-push" value="push / branch create" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;fontSize=10;" edge="1" source="developer" target="dev-branch" parent="git-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- dev/* → stg-* (PR + merge) -->
+        <mxCell id="dev-to-stg" value="PR + merge&lt;br/&gt;VERSION check" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#b46504;fontSize=10;fontStyle=1;" edge="1" source="dev-branch" target="stg-branch" parent="git-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- stg-* → main (PR + merge) -->
+        <mxCell id="stg-to-main" value="PR + merge&lt;br/&gt;stg_merge-promote ✓ required" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontColor=#336600;fontSize=10;fontStyle=1;" edge="1" source="stg-branch" target="main-branch" parent="git-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ops/* → main (dashed bypass) -->
+        <mxCell id="ops-to-main" value="PR + repo-owner bypass" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontColor=#9673a6;fontSize=10;dashed=1;" edge="1" source="ops-branch" target="main-branch" parent="git-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Branch Rules annotation -->
+        <mxCell id="branch-rules" value="&lt;b&gt;Branch Protection Rules&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;protect_main: PR + 1 approval&lt;br/&gt;+ stg_merge-promote ✓&lt;br/&gt;&lt;br/&gt;protect_stg_X.Y.Z: PR + 1 approval&lt;br/&gt;+ dev_build-validate ✓&lt;br/&gt;&lt;br/&gt;bypass: repo_owners = true&lt;/font&gt;" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;fontSize=11;whiteSpace=wrap;rounded=1;" vertex="1" parent="git-container">
+          <mxGeometry x="20" y="300" width="230" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- VERSION file annotation -->
+        <mxCell id="version-note" value="&lt;b&gt;VERSION file&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Single source of truth&lt;br/&gt;Written by stg_merge only&lt;br/&gt;File Store mutex prevents races&lt;br/&gt;SemVer + rc.N / hotfix.N labels&lt;br/&gt;Humans never touch it&lt;/font&gt;" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=left;verticalAlign=top;fontSize=11;whiteSpace=wrap;rounded=1;" vertex="1" parent="git-container">
+          <mxGeometry x="270" y="300" width="200" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Developer pushes to ops/* -->
+        <mxCell id="ops-push" value="push" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontSize=10;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="developer" target="ops-branch" parent="git-container">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="530" y="77" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- SECTION B: Harness Pipelines                    -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="pipeline-container" value="Harness Pipelines  (run in freedomfury/imageflow container)" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="660" y="90" width="440" height="450" as="geometry" />
+        </mxCell>
+
+        <!-- dev_build pipeline -->
+        <mxCell id="dev-build" value="&lt;b&gt;dev_build&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;1. branch_check&lt;br/&gt;2. flow_check (PR only)&lt;br/&gt;3. version_precheck (PR only)&lt;br/&gt;4. mock_build&lt;br/&gt;   (content hash + MinIO cache)&lt;br/&gt;5. mock_short_tests&lt;br/&gt;6. tag_artifact&lt;br/&gt;7. publish_artifact&lt;br/&gt;&lt;br/&gt;Sets: dev_build-validate ✓&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;fontSize=11;" vertex="1" parent="pipeline-container">
+          <mxGeometry x="20" y="50" width="190" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- ops_build pipeline -->
+        <mxCell id="ops-build-pipe" value="&lt;b&gt;ops_build&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;1. branch_check&lt;br/&gt;2. code_check&lt;br/&gt;   (rejects image code&lt;br/&gt;   in diff — VERSION,&lt;br/&gt;   scripts/ paths)&lt;br/&gt;&lt;br/&gt;Sets: ops_build-ops ✓&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=11;" vertex="1" parent="pipeline-container">
+          <mxGeometry x="230" y="50" width="190" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- stg_merge pipeline -->
+        <mxCell id="stg-merge-pipe" value="&lt;b&gt;stg_merge&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;1. version_change_check&lt;br/&gt;   (skip if VERSION-only)&lt;br/&gt;2. mock_long_tests&lt;br/&gt;3. promote artifact&lt;br/&gt;   → staging/&amp;lt;branch&amp;gt;/&lt;br/&gt;&lt;br/&gt;Sets: stg_merge-promote ✓&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;fontSize=11;" vertex="1" parent="pipeline-container">
+          <mxGeometry x="20" y="260" width="190" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- main_release pipeline -->
+        <mxCell id="main-release-pipe" value="&lt;b&gt;main_release&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;1. read_version&lt;br/&gt;   (guards pre-release)&lt;br/&gt;2. tag_release_artifact&lt;br/&gt;   (staging/ → releases/)&lt;br/&gt;3. close_sprint&lt;br/&gt;   - create next stg-* branch&lt;br/&gt;   - create protect_stg_* rule&lt;br/&gt;   - bump VERSION on main&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;fontSize=11;" vertex="1" parent="pipeline-container">
+          <mxGeometry x="230" y="260" width="190" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- SECTION C: MinIO Artifact Storage               -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="minio-container" value="MinIO Artifact Storage  (Build Once · Promote Through Gates)" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="580" width="790" height="170" as="geometry" />
+        </mxCell>
+
+        <!-- dev/ bucket -->
+        <mxCell id="dev-bucket" value="dev/&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Build cache&lt;br/&gt;Content-hash keyed&lt;br/&gt;Skip rebuild if unchanged&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="minio-container">
+          <mxGeometry x="30" y="50" width="160" height="95" as="geometry" />
+        </mxCell>
+
+        <!-- staging/ bucket -->
+        <mxCell id="staging-bucket" value="staging/stg-X.Y.Z/&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Promoted after stg_merge&lt;br/&gt;Long-test validated artifact&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="minio-container">
+          <mxGeometry x="310" y="50" width="170" height="95" as="geometry" />
+        </mxCell>
+
+        <!-- releases/ bucket -->
+        <mxCell id="releases-bucket" value="releases/X.Y.Z/&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Promoted at main merge&lt;br/&gt;Immutable, production artifacts&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="minio-container">
+          <mxGeometry x="600" y="50" width="160" height="95" as="geometry" />
+        </mxCell>
+
+        <!-- dev/ → staging/ promotion label -->
+        <mxCell id="dev-to-staging-arrow" value="promote (stg_merge)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#b46504;fontSize=10;fontStyle=1;endArrow=block;endFill=1;" edge="1" source="dev-bucket" target="staging-bucket" parent="minio-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- staging/ → releases/ promotion label -->
+        <mxCell id="staging-to-releases-arrow" value="promote (main_release)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontColor=#336600;fontSize=10;fontStyle=1;endArrow=block;endFill=1;" edge="1" source="staging-bucket" target="releases-bucket" parent="minio-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- SECTION D: Control Plane                        -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="control-container" value="Control Plane (Local)" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="90" width="310" height="660" as="geometry" />
+        </mxCell>
+
+        <!-- Terraform -->
+        <mxCell id="terraform" value="&lt;b&gt;Terraform (infra/)&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Manages (permanent):&lt;br/&gt;• Harness Project&lt;br/&gt;• Code Repository&lt;br/&gt;• Pipeline definitions (4)&lt;br/&gt;• Webhook triggers (6)&lt;br/&gt;• protect_main branch rule&lt;br/&gt;• Harness Secrets (code_api_key)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;fontSize=11;" vertex="1" parent="control-container">
+          <mxGeometry x="20" y="50" width="270" height="150" as="geometry" />
+        </mxCell>
+
+        <!-- Docker Image -->
+        <mxCell id="docker-image" value="&lt;b&gt;Docker: freedomfury/imageflow&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Base: AlmaLinux 9 minimal 9.7&lt;br/&gt;Contains:&lt;br/&gt;• Python 3.12, pip, git, envsubst&lt;br/&gt;• Code SDK (141 endpoints)&lt;br/&gt;• Pipeline SDK (86 endpoints)&lt;br/&gt;• harness-cli (225 commands)&lt;br/&gt;&lt;br/&gt;Used by: all 4 pipelines&lt;br/&gt;imagePullPolicy: Always&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;fontSize=11;" vertex="1" parent="control-container">
+          <mxGeometry x="20" y="230" width="270" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- harness-cli -->
+        <mxCell id="harness-cli" value="&lt;b&gt;harness-cli&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;225 commands auto-generated&lt;br/&gt;from OpenAPI specs&lt;br/&gt;&lt;br/&gt;Custom commands:&lt;br/&gt;• run &lt;pipeline&gt; --branch &lt;branch&gt;&lt;br/&gt;• logs latest/find/get&lt;br/&gt;&lt;br/&gt;Used by: pipeline steps,&lt;br/&gt;local ops, AI assistant&lt;br/&gt;&lt;br/&gt;--format / -f: jq filtering&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;fontSize=11;" vertex="1" parent="control-container">
+          <mxGeometry x="20" y="420" width="270" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- Python SDKs -->
+        <mxCell id="python-sdks" value="&lt;b&gt;Python SDKs (generated)&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;Code API: 141 endpoints&lt;br/&gt;Pipeline API: 86 endpoints&lt;br/&gt;Generated via openapi-python-client&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;fontSize=11;" vertex="1" parent="control-container">
+          <mxGeometry x="20" y="610" width="270" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- CROSS-CONTAINER TRIGGER ARROWS                  -->
+        <!-- ═══════════════════════════════════════════════ -->
+
+        <!-- dev/* → dev_build (webhook trigger) -->
+        <mxCell id="trigger-dev-build" value="Push / PR / Branch Create&lt;br/&gt;webhook trigger" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;fontColor=#b85450;fontSize=10;fontStyle=1;endArrow=block;endFill=1;" edge="1" source="dev-branch" target="dev-build" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- stg-* → stg_merge (webhook trigger) -->
+        <mxCell id="trigger-stg-merge" value="Push trigger" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#b46504;fontSize=10;fontStyle=1;endArrow=block;endFill=1;" edge="1" source="stg-branch" target="stg-merge-pipe" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- main → main_release (webhook trigger) -->
+        <mxCell id="trigger-main-release" value="Push trigger" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontColor=#336600;fontSize=10;fontStyle=1;endArrow=block;endFill=1;" edge="1" source="main-branch" target="main-release-pipe" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ops/* → ops_build (webhook trigger) -->
+        <mxCell id="trigger-ops-build" value="Push trigger" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;fontColor=#9673a6;fontSize=10;fontStyle=1;endArrow=block;endFill=1;" edge="1" source="ops-branch" target="ops-build-pipe" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- dev_build → dev/ MinIO (cache check/write) -->
+        <mxCell id="devbuild-to-minio" value="cache check / write" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;fontColor=#b85450;fontSize=10;dashed=1;endArrow=block;endFill=1;" edge="1" source="dev-build" target="dev-bucket" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- stg_merge → staging/ MinIO -->
+        <mxCell id="stgmerge-to-minio" value="promote artifact" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;fontColor=#b46504;fontSize=10;fontStyle=1;endArrow=block;endFill=1;" edge="1" source="stg-merge-pipe" target="staging-bucket" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- main_release → releases/ MinIO -->
+        <mxCell id="mainrelease-to-minio" value="promote to releases/" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontColor=#336600;fontSize=10;fontStyle=1;endArrow=block;endFill=1;" edge="1" source="main-release-pipe" target="releases-bucket" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- main_release → creates next stg-* branch (feedback loop) -->
+        <mxCell id="mainrelease-creates-stg" value="creates next stg-* branch&lt;br/&gt;+ branch protection rule" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontColor=#336600;fontSize=10;dashed=1;endArrow=block;endFill=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="main-release-pipe" target="stg-branch" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="630" y="465" />
+              <mxPoint x="630" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Terraform → Harness Code (provisions) -->
+        <mxCell id="tf-provisions" value="provisions repo,&lt;br/&gt;pipelines, triggers" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;fontColor=#006EAF;fontSize=10;dashed=1;endArrow=block;endFill=1;" edge="1" source="terraform" target="pipeline-container" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Docker image → pipelines (used by) -->
+        <mxCell id="docker-to-pipes" value="runs all pipeline steps" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;fontColor=#336600;fontSize=10;dashed=1;endArrow=block;endFill=1;" edge="1" source="docker-image" target="pipeline-container" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- LEGEND                                          -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <mxCell id="legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;─── solid arrow: code / artifact flow&lt;br/&gt;- - - dashed arrow: provisioning / feedback&lt;br/&gt;✓ = required status check for merge&lt;br/&gt;&lt;br/&gt;Flow direction: dev/* → stg-* → main (unidirectional)&lt;br/&gt;ops/* → main (bypass, human gate)&lt;/font&gt;" style="text;html=1;strokeColor=#666666;fillColor=#f5f5f5;align=left;verticalAlign=top;fontSize=11;whiteSpace=wrap;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="870" y="580" width="260" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- Current State badge -->
+        <mxCell id="current-state" value="&lt;b&gt;Current State (2026-04-15)&lt;/b&gt;&lt;br/&gt;&lt;font style=&apos;font-size:10px&apos;&gt;main: VERSION 0.8.0 (released)&lt;br/&gt;stg-0.9.0: active sprint branch&lt;br/&gt;Sprints 0.3.0–0.8.0 all confirmed ✓&lt;br/&gt;Full end-to-end flow operational&lt;/font&gt;" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=left;verticalAlign=top;fontSize=11;whiteSpace=wrap;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="870" y="730" width="260" height="100" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

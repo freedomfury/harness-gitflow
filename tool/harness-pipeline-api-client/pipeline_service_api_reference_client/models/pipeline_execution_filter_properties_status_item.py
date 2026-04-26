@@ -1,0 +1,81 @@
+from typing import Literal, cast
+
+PipelineExecutionFilterPropertiesStatusItem = Literal[
+    "Aborted",
+    "AbortedByFreeze",
+    "APPROVAL_REJECTED",
+    "APPROVAL_WAITING",
+    "ApprovalRejected",
+    "ApprovalWaiting",
+    "AsyncWaiting",
+    "Discontinuing",
+    "Errored",
+    "Expired",
+    "Failed",
+    "IgnoreFailed",
+    "InputWaiting",
+    "INTERVENTION_WAITING",
+    "InterventionWaiting",
+    "NOT_STARTED",
+    "NotStarted",
+    "Paused",
+    "Pausing",
+    "Queued",
+    "QueuedExecutionConcurrencyReached",
+    "QueuedGlobalInfraCapacityReached",
+    "QueuedLicenseLimitReached",
+    "ResourceWaiting",
+    "Running",
+    "Skipped",
+    "Success",
+    "Suspended",
+    "TaskWaiting",
+    "TimedWaiting",
+    "UploadWaiting",
+    "Waiting",
+    "WaitStepRunning",
+]
+
+PIPELINE_EXECUTION_FILTER_PROPERTIES_STATUS_ITEM_VALUES: set[PipelineExecutionFilterPropertiesStatusItem] = {
+    "Aborted",
+    "AbortedByFreeze",
+    "APPROVAL_REJECTED",
+    "APPROVAL_WAITING",
+    "ApprovalRejected",
+    "ApprovalWaiting",
+    "AsyncWaiting",
+    "Discontinuing",
+    "Errored",
+    "Expired",
+    "Failed",
+    "IgnoreFailed",
+    "InputWaiting",
+    "INTERVENTION_WAITING",
+    "InterventionWaiting",
+    "NOT_STARTED",
+    "NotStarted",
+    "Paused",
+    "Pausing",
+    "Queued",
+    "QueuedExecutionConcurrencyReached",
+    "QueuedGlobalInfraCapacityReached",
+    "QueuedLicenseLimitReached",
+    "ResourceWaiting",
+    "Running",
+    "Skipped",
+    "Success",
+    "Suspended",
+    "TaskWaiting",
+    "TimedWaiting",
+    "UploadWaiting",
+    "Waiting",
+    "WaitStepRunning",
+}
+
+
+def check_pipeline_execution_filter_properties_status_item(value: str) -> PipelineExecutionFilterPropertiesStatusItem:
+    if value in PIPELINE_EXECUTION_FILTER_PROPERTIES_STATUS_ITEM_VALUES:
+        return cast(PipelineExecutionFilterPropertiesStatusItem, value)
+    raise TypeError(
+        f"Unexpected value {value!r}. Expected one of {PIPELINE_EXECUTION_FILTER_PROPERTIES_STATUS_ITEM_VALUES!r}"
+    )

@@ -1,0 +1,193 @@
+pipeline:
+  name: dev build
+  identifier: dev_build
+  orgIdentifier: default
+  projectIdentifier: image_flow
+  stages:
+    - stage:
+        name: validate
+        identifier: validate
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: branch check
+                  identifier: branch_check
+                  spec:
+                    connectorRef: Docker
+                    image: ubuntu:resolute
+                    imagePullPolicy: IfNotPresent
+                    shell: Bash
+                    command: |-
+                      BRANCH="$DRONE_SOURCE_BRANCH"
+
+                      case "$BRANCH" in
+                        dev/*|stg-*|main|ops/*)
+                          echo "branch: $BRANCH — OK"
+                          ;;
+                        *)
+                          echo "ERROR: branch '$BRANCH' is not in a recognized namespace."
+                          echo "  expected: dev/*, stg-*, main, ops/*"
+                          echo "  got:      $BRANCH"
+                          exit 1
+                          ;;
+                      esac
+
+              - step:
+                  type: Run
+                  name: flow check
+                  identifier: flow_check
+                  spec:
+                    connectorRef: Docker
+                    image: ubuntu:resolute
+                    imagePullPolicy: IfNotPresent
+                    shell: Bash
+                    command: |-
+                      BRANCH="$DRONE_SOURCE_BRANCH"
+                      PR_TARGET="$DRONE_TARGET_BRANCH"
+                      EVENT="$DRONE_BUILD_EVENT"
+
+                      if [ "$EVENT" != "pull_request" ]; then
+                        echo "push build — skipping flow check"
+                        exit 0
+                      fi
+
+                      echo "PR: $BRANCH → $PR_TARGET"
+
+                      case "$BRANCH" in
+                        dev/*)
+                          case "$PR_TARGET" in
+                            stg-*) echo "flow OK: dev/* → stg-*" ;;
+                            *)
+                              echo "ERROR: dev/* branches must target stg-*, not '$PR_TARGET'"
+                              exit 1
+                              ;;
+                          esac
+                          ;;
+                        stg-*)
+                          if [ "$PR_TARGET" != "main" ]; then
+                            echo "ERROR: stg-* branches must target main, not '$PR_TARGET'"
+                            exit 1
+                          fi
+                          echo "flow OK: stg-* → main"
+                          ;;
+                        ops/*)
+                          if [ "$PR_TARGET" != "main" ]; then
+                            echo "ERROR: ops/* branches must target main, not '$PR_TARGET'"
+                            exit 1
+                          fi
+                          echo "flow OK: ops/* → main"
+                          ;;
+                      esac
+
+              - step:
+                  type: Run
+                  name: version pre-check
+                  identifier: version_precheck
+                  spec:
+                    connectorRef: Docker
+                    image: ubuntu:resolute
+                    imagePullPolicy: IfNotPresent
+                    shell: Bash
+                    command: |-
+                      VERSION=$(cat VERSION)
+                      echo "VERSION: $VERSION"
+                      # TODO: validate VERSION is bumped above stg current
+                      echo "version pre-check: OK (stub)"
+
+              - step:
+                  type: Run
+                  name: mock build
+                  identifier: mock_build
+                  spec:
+                    connectorRef: Docker
+                    image: freedomfury/imageflow:latest
+                    imagePullPolicy: Always
+                    shell: Bash
+                    envVariables:
+                      MINIO_URL: <+secrets.getValue("minio_url")>
+                      MINIO_USER: <+secrets.getValue("minio_user")>
+                      MINIO_PASS: <+secrets.getValue("minio_pass")>
+                    command: |-
+                      CONTENT_HASH=$(echo "$DRONE_COMMIT_SHA-$DRONE_SOURCE_BRANCH" | sha256sum | cut -c1-12)
+                      echo "$CONTENT_HASH" > build.env
+
+                      mc alias set minio "$MINIO_URL" "$MINIO_USER" "$MINIO_PASS" --quiet
+
+                      ARTIFACT_PATH="global/harness/dev/$CONTENT_HASH/artifact.stub"
+
+                      if mc ls "minio/$ARTIFACT_PATH" > /dev/null 2>&1; then
+                        echo "build: cache hit — $ARTIFACT_PATH"
+                        echo "build: skipping rebuild"
+                      else
+                        SLEEP=$((RANDOM % 15 + 1))
+                        echo "build: simulating AMI build (${SLEEP}s)"
+                        sleep "$SLEEP"
+                        echo "artifact-stub: $DRONE_COMMIT_SHA" > artifact.stub
+                        mc cp artifact.stub "minio/$ARTIFACT_PATH"
+                        echo "build: complete — pushed $ARTIFACT_PATH"
+                      fi
+
+              - step:
+                  type: Run
+                  name: mock short tests
+                  identifier: mock_short_tests
+                  spec:
+                    connectorRef: Docker
+                    image: ubuntu:resolute
+                    imagePullPolicy: IfNotPresent
+                    shell: Bash
+                    command: |-
+                      SLEEP=$((RANDOM % 15 + 1))
+                      echo "tests: running short test suite (${SLEEP}s)"
+                      sleep "$SLEEP"
+                      echo "tests: all passed"
+
+              - step:
+                  type: Run
+                  name: tag artifact
+                  identifier: tag_artifact
+                  spec:
+                    connectorRef: Docker
+                    image: freedomfury/imageflow:latest
+                    imagePullPolicy: Always
+                    shell: Bash
+                    envVariables:
+                      MINIO_URL: <+secrets.getValue("minio_url")>
+                      MINIO_USER: <+secrets.getValue("minio_user")>
+                      MINIO_PASS: <+secrets.getValue("minio_pass")>
+                    command: |-
+                      VERSION=$(cat VERSION)
+                      CONTENT_HASH=$(cat build.env)
+                      ARTIFACT_URL="$MINIO_URL/global/harness/dev/$CONTENT_HASH/artifact.stub"
+                      echo "artifact tagged: $VERSION-$DRONE_SOURCE_BRANCH @ $CONTENT_HASH"
+                      echo "$ARTIFACT_URL" > artifact_url.txt
+                      echo "tag: OK"
+
+              - step:
+                  type: Plugin
+                  name: publish artifact
+                  identifier: publish_artifact
+                  spec:
+                    connectorRef: Docker
+                    image: plugins/artifact-metadata-publisher
+                    settings:
+                      file_urls: artifact_url.txt
+                      artifact_file: artifact.txt
+
+  delegateSelectors:
+    - image-flow-delegate
+  properties:
+    ci:
+      codebase:
+        repoName: image-build
+        build: <+input>

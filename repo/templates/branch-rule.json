@@ -1,0 +1,24 @@
+{
+  "identifier": "$RULE_ID",
+  "type": "branch",
+  "state": "active",
+  "pattern": {
+    "include": ["$NEXT_STG"]
+  },
+  "definition": {
+    "bypass": {
+      "repo_owners": true
+    },
+    "pullreq": {
+      "approvals": {
+        "require_minimum_count": 1
+      },
+      "comments": {},
+      "status_checks": {
+        "require_uids": ["dev_build-validate"]
+      },
+      "merge": {},
+      "reviewers": {}
+    }
+  }
+}
