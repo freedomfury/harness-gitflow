@@ -1,8 +1,8 @@
 # harness-poc
 
-A proof-of-concept CI/CD pipeline for golden image builds, running on **Harness Free Tier**. The goal is to prove a multi-branch release flow built on one principle:
+A proof-of-concept CI/CD pipeline for golden image builds or running on **Harness Free Tier**. The goal is to prove a multi-branch release flow built on one principle:
 
-> **Build once. Test progressively. Promote through gates. Never rebuild unless code actually changed.**
+> **Build once. Test progressively. Promote through gates. Never rebuild unless the code has actually changed.**
 
 This repo is also an experiment in division of labor: a human (me) designed the workflow, branch strategy, VERSION file mechanics, and pipeline gates; an AI assistant generated the SDKs, the CLI, the Terraform, and most of the pipeline YAML from that design. The `docs/lessons-learned.md` file is a record of where the AI learned the hard way.
 
