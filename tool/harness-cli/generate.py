@@ -295,9 +295,9 @@ def generate_command(endpoint_info, sdk_config, sdk_name):
     body_required = has_body and not endpoint_info["body_param"]["has_default"]
     if has_body:
         if body_required:
-            lines.append('@click.option("--body", "body_json", required=True, help="JSON request body")')
+            lines.append('@click.option("--body", "body_json", required=True, help="JSON request body (or @file.json, or - for stdin)")')
         else:
-            lines.append('@click.option("--body", "body_json", default=None, help="JSON request body")')
+            lines.append('@click.option("--body", "body_json", default=None, help="JSON request body (or @file.json, or - for stdin)")')
 
     lines.append("@click.pass_context")
 
@@ -343,10 +343,10 @@ def generate_command(endpoint_info, sdk_config, sdk_name):
         skip_types = {"Unset", "Any", "None"}
         if body_type and body_type not in skip_types:
             if body_required:
-                lines.append(f'    kwargs["body"] = {body_type}.from_dict(json.loads(body_json))')
+                lines.append(f'    kwargs["body"] = {body_type}.from_dict(read_body(body_json))')
             else:
                 lines.append(f"    if body_json:")
-                lines.append(f'        kwargs["body"] = {body_type}.from_dict(json.loads(body_json))')
+                lines.append(f'        kwargs["body"] = {body_type}.from_dict(read_body(body_json))')
 
     lines.append(f"    try:")
     lines.append(f"        render({mod_name}.sync_detailed(**kwargs))")
@@ -431,7 +431,7 @@ def generate_group_file(sdk_config, group, sdk_name):
         lines.append(f"from {types_pkg} import UNSET")
 
     lines.append("")
-    lines.append("from harness_cli.output import render, render_raw")
+    lines.append("from harness_cli.output import read_body, render, render_raw")
     lines.append("")
     lines.append("")
 
@@ -501,8 +501,9 @@ def generate_main_py(all_groups_by_sdk):
     lines.append("")
     lines.append("")
     lines.append("@click.group()")
+    lines.append("@click.option(\"-f\", \"--format\", \"format_expr\", default=None, help=\"jq-style filter for output (e.g., '.[].number, .[].state')\")")
     lines.append("@click.pass_context")
-    lines.append("def cli(ctx):")
+    lines.append("def cli(ctx, format_expr):")
     lines.append('    """Harness CLI — typed pass-through for Harness Code and Pipeline APIs.')
     lines.append("")
     lines.append("    Credentials resolved from environment variables:")
@@ -512,6 +513,8 @@ def generate_main_py(all_groups_by_sdk):
     lines.append('      Local dev: POC_HARNESS_ACCOUNT_ID, POC_HARNESS_API_KEY"""')
     lines.append("    ctx.ensure_object(dict)")
     lines.append("    ctx.obj = LazyConfig()")
+    lines.append("    if format_expr is not None:")
+    lines.append('        ctx.obj["format"] = format_expr')
     lines.append("")
     lines.append("")
 

@@ -20,6 +20,29 @@ except ImportError:
     PipelineFailure = None
 
 
+def read_body(body_json):
+    """Parse a --body value into a dict.
+
+    Accepts an inline JSON string, or ``@path/to/file.json`` to read JSON
+    from a file (``@-`` reads from stdin). Returns the parsed object.
+    """
+    if body_json is None:
+        return None
+    raw = body_json
+    if isinstance(body_json, str) and body_json.startswith("@"):
+        path = body_json[1:]
+        if path == "-":
+            raw = sys.stdin.read()
+        else:
+            with open(path, "r") as fh:
+                raw = fh.read()
+    try:
+        return json.loads(raw)
+    except (ValueError, TypeError) as exc:
+        click.echo(f"Invalid JSON body: {exc}", err=True)
+        sys.exit(1)
+
+
 def get_format():
     """Get format expression from current Click context."""
     ctx = click.get_current_context(silent=True)

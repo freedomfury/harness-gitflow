@@ -24,7 +24,12 @@ tool/
   harness-cli/            ← CLI source (Click-based, auto-generated + 2 custom commands)
   harness-code-api-client/    ← Code API SDK (141 endpoints)
   harness-pipeline-api-client/ ← Pipeline API SDK (86 endpoints)
+  harness-platform-api-client/ ← Platform (NG) SDK — large spec, only `ng-file-store` wired into the CLI
 ```
+
+> **Generated vs. tracked:** `harness_cli/main.py` and the per-group command files are **generated** (git-ignored) — rebuilt by `generate.py`. Only the custom commands (`logs.py`, `run.py`), the shared `output.py`, and `generate.py` itself are tracked. After editing `generate.py`, run it to regenerate; never hand-edit `main.py` or a generated command file.
+
+> **`--body` accepts `@file`:** any command taking `--body` accepts inline JSON, `@path/to/file.json`, or `@-` for stdin (handled by `read_body` in `output.py`).
 
 `tool/` is at the **project root**, not inside `repo/`. It is never synced to Harness Code. No git checkout needed to access it.
 

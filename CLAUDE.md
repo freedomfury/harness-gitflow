@@ -69,7 +69,8 @@ dev/* push/PR → dev_build (validate) → PR to stg-* → merge → stg_merge (
 | `harness-pipeline-openapi.yaml` | Harness Pipeline OpenAPI spec |
 | `tool/harness-code-api-client/` | Generated Code SDK (141 endpoints) |
 | `tool/harness-pipeline-api-client/` | Generated Pipeline SDK (86 endpoints) |
-| `tool/harness-cli/` | Auto-generated CLI (225 commands) |
+| `tool/harness-platform-api-client/` | Generated Platform (NG) SDK — large spec, only `ng-file-store` wired into the CLI |
+| `tool/harness-cli/` | Auto-generated CLI (`main.py` + command files are git-ignored/regenerated; only `run`, `logs`, `output.py`, `generate.py` are tracked) |
 | `tool/harness-cli/generate.py` | CLI generator — `python generate.py` regenerates everything |
 | `tool/harness-cli/harness_cli/commands/logs.py` | Custom: `logs latest/find/get` |
 | `tool/harness-cli/harness_cli/commands/run.py` | Custom: `run <pipeline> --branch <branch>` |
