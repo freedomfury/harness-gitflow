@@ -2,9 +2,12 @@
 
 import json
 import re
+import sys
 
 import click
 import httpx
+
+from harness_cli.output import http_error_message
 
 
 def _make_client(ctx):
@@ -25,24 +28,46 @@ def _common_params(ctx):
     }
 
 
+def _die(msg):
+    """Echo an error to stderr and exit non-zero."""
+    click.echo(msg, err=True)
+    sys.exit(1)
+
+
+def _json_or_die(resp):
+    """Parse a JSON body, exiting clearly on non-JSON responses.
+
+    The common trigger is an expired/invalid API key, for which the Harness
+    gateway returns its HTML sign-in page (HTTP 200, non-JSON).
+    """
+    try:
+        return resp.json()
+    except ValueError:
+        _die(http_error_message(resp))
+
+
 def _fetch_build_num(client, ctx, pipeline, execution_id):
     """Look up runSequence for a given execution_id from the summary API."""
     params = _common_params(ctx)
     params.update({"pipelineIdentifier": pipeline, "page": 0, "size": 10})
 
-    resp = client.post(
-        "/pipeline/api/pipelines/execution/summary",
-        params=params,
-        json={"filterType": "PipelineExecution"},
-    )
-    if resp.status_code != 200:
-        click.echo(f"HTTP {resp.status_code}: {resp.text[:500]}", err=True)
-        return None
+    try:
+        resp = client.post(
+            "/pipeline/api/pipelines/execution/summary",
+            params=params,
+            json={"filterType": "PipelineExecution"},
+        )
+    except httpx.HTTPError as e:
+        _die(f"network error: {e}")
 
-    for ex in resp.json().get("data", {}).get("content", []):
+    if resp.status_code != 200:
+        _die(http_error_message(resp))
+
+    data = _json_or_die(resp)
+    for ex in data.get("data", {}).get("content", []):
         if ex.get("planExecutionId") == execution_id:
             return ex.get("runSequence")
-    return None
+    _die(f"Execution {execution_id} not found in recent runs.")
 
 
 def _fetch_latest_execution(client, ctx, pipeline):
@@ -50,19 +75,21 @@ def _fetch_latest_execution(client, ctx, pipeline):
     params = _common_params(ctx)
     params.update({"pipelineIdentifier": pipeline, "page": 0, "size": 1})
 
-    resp = client.post(
-        "/pipeline/api/pipelines/execution/summary",
-        params=params,
-        json={"filterType": "PipelineExecution"},
-    )
-    if resp.status_code != 200:
-        click.echo(f"HTTP {resp.status_code}: {resp.text[:500]}", err=True)
-        return None, None
+    try:
+        resp = client.post(
+            "/pipeline/api/pipelines/execution/summary",
+            params=params,
+            json={"filterType": "PipelineExecution"},
+        )
+    except httpx.HTTPError as e:
+        _die(f"network error: {e}")
 
-    content = resp.json().get("data", {}).get("content", [])
+    if resp.status_code != 200:
+        _die(http_error_message(resp))
+
+    content = _json_or_die(resp).get("data", {}).get("content", [])
     if not content:
-        click.echo(f"No executions found for pipeline '{pipeline}'.", err=True)
-        return None, None
+        _die(f"No executions found for pipeline '{pipeline}'.")
 
     entry = content[0]
     return entry.get("planExecutionId"), entry.get("runSequence")
@@ -72,13 +99,16 @@ def _print_step_logs(client, account_id, execution_id, pipeline, run_sequence, s
     """Fetch and print logs for a single step."""
     log_key = f"{account_id}/pipeline/{pipeline}/{run_sequence}/-{execution_id}/{stage}/{step_id}"
 
-    resp = client.get(
-        "/log-service/blob",
-        params={"accountID": account_id, "key": log_key},
-    )
+    try:
+        resp = client.get(
+            "/log-service/blob",
+            params={"accountID": account_id, "key": log_key},
+        )
+    except httpx.HTTPError as e:
+        _die(f"network error: {e}")
+
     if resp.status_code != 200:
-        click.echo(f"HTTP {resp.status_code}: {resp.text[:500]}", err=True)
-        return
+        _die(http_error_message(resp))
 
     text = resp.text.strip()
     if not text:
@@ -99,16 +129,19 @@ def _print_step_logs(client, account_id, execution_id, pipeline, run_sequence, s
 
 def _print_step_list(client, ctx, execution_id):
     """Fetch and print all steps for an execution."""
-    resp = client.get(
-        f"/pipeline/api/pipelines/execution/v2/{execution_id}",
-        params=_common_params(ctx),
-    )
+    try:
+        resp = client.get(
+            f"/pipeline/api/pipelines/execution/v2/{execution_id}",
+            params=_common_params(ctx),
+        )
+    except httpx.HTTPError as e:
+        _die(f"network error: {e}")
+
     if resp.status_code != 200:
-        click.echo(f"HTTP {resp.status_code}: {resp.text[:500]}", err=True)
-        return
+        _die(http_error_message(resp))
 
     layout = (
-        resp.json()
+        _json_or_die(resp)
         .get("data", {})
         .get("pipelineExecutionSummary", {})
         .get("layoutNodeMap", {})
@@ -152,8 +185,7 @@ def get(ctx, execution_id, step_id, pipeline, stage):
 
     run_sequence = _fetch_build_num(client, ctx, pipeline, execution_id)
     if run_sequence is None:
-        click.echo("Could not find build number for execution.", err=True)
-        return
+        _die("Could not find build number for execution.")
 
     _print_step_logs(client, account_id, execution_id, pipeline, run_sequence, step_id, stage)
 
@@ -187,13 +219,12 @@ def latest(ctx, pipeline, step, stage):
     client = _make_client(ctx)
 
     execution_id, run_sequence = _fetch_latest_execution(client, ctx, pipeline)
-    if execution_id is None:
-        return
+    if not execution_id:
+        _die("Could not determine latest execution.")
 
     if step:
         if run_sequence is None:
-            click.echo("Could not determine run sequence for latest execution.", err=True)
-            return
+            _die("Could not determine run sequence for latest execution.")
         _print_step_logs(client, account_id, execution_id, pipeline, run_sequence, step, stage)
     else:
         _print_step_list(client, ctx, execution_id)

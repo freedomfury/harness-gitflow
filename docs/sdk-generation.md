@@ -8,8 +8,8 @@ This documents how to generate typed Python SDKs and a CLI from Harness's OpenAP
 |-----------|----------|-----------|--------|
 | Code SDK | `repo/tool/harness-code-api-client/` | 141 | Clean — no parsing issues |
 | Pipeline SDK | `repo/tool/harness-pipeline-api-client/` | 86 | Working — some model parsing bugs, handled by `render_raw` fallback |
-| CLI | `repo/tool/harness-cli/` | 225 (26 groups) | Auto-generated from both SDKs |
-| CLI generator | `repo/tool/harness-cli/generate.py` | — | Reads SDK function signatures, outputs Click commands |
+| CLI | `repo/tool/harness-cli/` | 225 (26 groups) | Builds Click commands dynamically at runtime from both SDKs |
+| CLI command builder | `repo/tool/harness-cli/harness_cli/loader.py` | — | Reflects over SDK function signatures at import time; no generation step |
 
 ### CLI Command Groups
 
@@ -64,10 +64,9 @@ To add a new service (e.g., Platform):
 
 1. Fetch the spec
 2. Generate the SDK: `openapi-python-client generate --path <spec> --output-path repo/tool/harness-<name>-api-client --config config.yaml`
-3. Add a new entry to the `SDKS` dict in `generate.py`
-4. Run `python generate.py --sdk <name>`
+3. Add a new entry to the `SDKS` dict in `tool/harness-cli/harness_cli/loader.py`
 
-New commands appear in the CLI automatically.
+New commands appear in the CLI automatically the next time it runs — there is no generation step.
 
 ## Step 2: Generate the SDKs
 
@@ -100,17 +99,12 @@ openapi-python-client generate \
 - Some `application/yaml` request bodies skipped
 - Model parsing fails on some responses (e.g., `PMSPipelineSummaryResponse.filters`) — the CLI's `render_raw` fallback handles this by re-executing with raw httpx
 
-**Bad defaults in both specs (handled by CLI generator):**
+**Bad defaults in both specs (handled by the CLI's runtime param classifier in `loader.py`):**
 - `max_divergence=0` — API requires positive integer → CLI passes `UNSET`
 - `git_ref="{Repository Default Branch}"` — literal placeholder → CLI passes `UNSET`
 - Enum defaults (sort, order) → CLI passes `UNSET` to let server decide
 - Boolean defaults that are Unset objects → CLI defaults to `False`
-
-**Additional generator bugs fixed:**
-- Required body params had `default=None` → generator detects `has_default=False` and adds `required=True` to Click option
-- `<class '...'>` annotation format for required (non-optional) body params → matched via `'>` regex pattern
-- Function name collisions (e.g., function `list_repos` shadows SDK import `list_repos`) → all Click handler functions suffixed with `_cmd`
-- Generator overwrites `main.py` on every run → preserves custom `logs` and `run` commands and `_api_key` in LazyConfig
+- Required body params (`has_default=False`) → `--body` is marked `required=True`; body model class is resolved from the live annotation via `typing.get_args` (no regex)
 
 ## Step 3: Install the SDKs
 
@@ -119,23 +113,13 @@ pip install -e repo/tool/harness-code-api-client
 pip install -e repo/tool/harness-pipeline-api-client
 ```
 
-## Step 4: Generate and Install the CLI
+## Step 4: Install the CLI
 
 ```bash
-cd repo/tool/harness-cli
-
-# Generate all groups from all SDKs
-python generate.py
-
-# Or target specific SDKs
-python generate.py --sdk code
-python generate.py --sdk pipeline
-
-# Install
-pip install -e .
+pip install -e repo/tool/harness-cli
 ```
 
-The generator introspects SDK function signatures and auto-generates Click commands. It handles bad defaults globally and uses `render_raw` fallback for Pipeline SDK model parsing failures.
+There is no CLI generation step. On startup, `harness_cli/loader.py` reflects over each installed SDK's `sync_detailed` signatures and builds the Click command groups in memory (lazily, per group, on first access). Editing a param-mapping rule means editing one function in `loader.py` — there are no generated files to regenerate. The `render_raw` fallback still handles Pipeline SDK model-parsing failures.
 
 ## Usage
 
@@ -198,7 +182,7 @@ harness-cli pl-triggers get-list-for-target --target-identifier dev_build
 
 ### Custom Commands
 
-Two commands are hand-written and not auto-generated. The generator always emits them so they survive regeneration.
+Three command groups are hand-written and not built by `loader.py` — they need raw httpx for YAML/multipart bodies the SDK reflection can't express. They are registered directly in `main.py` (`run`, `logs`, `ng-file-store`), so there is no generator to preserve them across.
 
 ```bash
 # Trigger a pipeline on a branch (SDK execute endpoint doesn't pass branch correctly)
@@ -252,8 +236,7 @@ openapi-python-client generate \
   --config /tmp/opc-config.yaml \
   --overwrite
 
-# Regenerate CLI
-cd repo/tool/harness-cli && python generate.py
+# No CLI regeneration needed — commands are built at runtime from the SDKs
 
 # Reinstall
 pip install -e repo/tool/harness-code-api-client

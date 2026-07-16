@@ -20,6 +20,69 @@ except ImportError:
     PipelineFailure = None
 
 
+def _verbose():
+    """True if --verbose was passed (read from the active Click context)."""
+    ctx = click.get_current_context(silent=True)
+    return bool(ctx and getattr(ctx, "obj", None) and ctx.obj.get("verbose"))
+
+
+def _response_body(resp):
+    """Best-effort body text from an httpx or generated-SDK response."""
+    if hasattr(resp, "text"):
+        return resp.text or ""
+    content = getattr(resp, "content", None)
+    if content:
+        try:
+            return content.decode("utf-8", "replace")
+        except Exception:
+            return ""
+    return ""
+
+
+def _looks_like_auth_html(resp):
+    """True if the response is the Harness HTML sign-in page (expired/invalid key).
+
+    Checks content-type first (cheap), then sniffs only the first bytes of the
+    body so it stays fast on large successful responses.
+    """
+    headers = getattr(resp, "headers", None)
+    if headers is not None:
+        try:
+            if "html" in headers.get("content-type", "").lower():
+                return True
+        except Exception:
+            pass
+    if hasattr(resp, "text"):
+        snippet = (resp.text or "")[:64]
+    else:
+        content = getattr(resp, "content", None)
+        snippet = content[:64].decode("utf-8", "replace") if content else ""
+    return snippet.lstrip().lower().startswith(("<!doctype", "<html"))
+
+
+def http_error_message(resp, verbose=None):
+    """Friendly one-line error for an HTTP error response.
+
+    Auth-redirect HTML (expired/invalid API key) collapses to a concise hint;
+    the raw body is appended only under --verbose.
+    """
+    if verbose is None:
+        verbose = _verbose()
+    try:
+        status = resp.status_code.value
+    except Exception:
+        status = getattr(resp, "status_code", "???")
+    if status in (401, 403) or _looks_like_auth_html(resp):
+        msg = f"Authentication failed (HTTP {status}) — check your API key / credentials."
+    else:
+        msg = f"HTTP {status}"
+    if verbose:
+        body = _response_body(resp)
+        if body:
+            msg += f"\n{body[:1000]}"
+    return msg
+
+
 def read_body(body_json):
     """Parse a --body value into a dict.
 
@@ -34,8 +97,12 @@ def read_body(body_json):
         if path == "-":
             raw = sys.stdin.read()
         else:
-            with open(path, "r") as fh:
-                raw = fh.read()
+            try:
+                with open(path, "r", encoding="utf-8") as fh:
+                    raw = fh.read()
+            except OSError as exc:
+                click.echo(f"Cannot read body file '{path}': {exc}", err=True)
+                sys.exit(1)
     try:
         return json.loads(raw)
     except (ValueError, TypeError) as exc:
@@ -56,15 +123,17 @@ def apply_format(data, format_expr):
     if not format_expr:
         return data
 
-    # Try jq Python module first (if installed)
+    # Try jq Python module first (if installed). If jq is available at all, a
+    # filter failure is a real error — exit non-zero rather than silently
+    # degrading to the dot-notation fallback (which returns wrong output).
     if _jq is not None:
         try:
             compiled = _jq.compile(format_expr)
             result = compiled.input(data)
-            output = result.text()
-            return output
-        except Exception:
-            pass
+            return result.text()
+        except Exception as exc:
+            click.echo(f"jq filter error: {exc}", err=True)
+            sys.exit(1)
 
     # Fallback: subprocess jq (if installed as CLI tool)
     import shutil
@@ -80,13 +149,14 @@ def apply_format(data, format_expr):
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
-            click.echo(f"jq filter failed: {e.stderr if e.stderr else format_expr}", err=True)
+            click.echo(f"jq filter failed: {e.stderr.strip() if e.stderr else format_expr}", err=True)
+            sys.exit(1)
 
-    # Final fallback: simple dot notation
+    # jq not available at all — best-effort dot-notation fallback.
     try:
         return _simple_dot_filter(data, format_expr)
-    except Exception as e:
-        click.echo(f"Format expression not supported (jq not available): {format_expr}", err=True)
+    except Exception:
+        click.echo(f"Format expression not supported (jq not installed): {format_expr}", err=True)
         return data
 
 
@@ -148,6 +218,17 @@ def render(response, expected_status=None):
         status = response.status_code.value
     except Exception:
         status = getattr(response, 'status_code', '???')
+
+    # Friendly handling for auth failures: an expired/invalid API key makes the
+    # Harness gateway return its HTML sign-in page (HTTP 401/403, a 302 redirect,
+    # or even 200). Detect the HTML body regardless of status.
+    try:
+        status_int = int(status)
+    except Exception:
+        status_int = 0
+    if status_int in (401, 403) or _looks_like_auth_html(response):
+        click.echo(http_error_message(response), err=True)
+        sys.exit(1)
 
     if expected_status and status not in expected_status:
         _print_error(status, response)
@@ -215,6 +296,9 @@ def render_raw(sdk_module, kwargs):
         request_kwargs = sdk_module._get_kwargs(**kwargs)
         httpx_client = client.get_httpx_client()
         response = httpx_client.request(**request_kwargs)
+        if response.status_code in (401, 403) or _looks_like_auth_html(response):
+            click.echo(http_error_message(response), err=True)
+            sys.exit(1)
         try:
             data = response.json()
             _output(data, format_expr)

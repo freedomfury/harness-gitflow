@@ -21,13 +21,13 @@ uv pip install -e tool/harness-code-api-client -e tool/harness-pipeline-api-clie
 
 ```
 tool/
-  harness-cli/            ← CLI source (Click-based, auto-generated + 2 custom commands)
+  harness-cli/            ← CLI source (Click-based, command groups built at runtime from the SDKs + 3 hand-written groups)
   harness-code-api-client/    ← Code API SDK (141 endpoints)
   harness-pipeline-api-client/ ← Pipeline API SDK (86 endpoints)
   harness-platform-api-client/ ← Platform (NG) SDK — large spec, only `ng-file-store` wired into the CLI
 ```
 
-> **Generated vs. tracked:** `harness_cli/main.py` and the per-group command files are **generated** (git-ignored) — rebuilt by `generate.py`. Only the custom commands (`logs.py`, `run.py`), the shared `output.py`, and `generate.py` itself are tracked. After editing `generate.py`, run it to regenerate; never hand-edit `main.py` or a generated command file.
+> **How the CLI is built:** command groups are **not** generated files. At startup, `harness_cli/loader.py` reflects over each SDK's `sync_detailed` signatures and builds the Click groups in memory (lazily, per group). All of `harness_cli/` is tracked source — `main.py`, `loader.py`, `output.py`, `config.py`, and the hand-written custom groups (`run.py`, `logs.py`, `ng_file_store.py`). To change how a param maps to a flag, edit one function in `loader.py`; there is nothing to regenerate.
 
 > **`--body` accepts `@file`:** any command taking `--body` accepts inline JSON, `@path/to/file.json`, or `@-` for stdin (handled by `read_body` in `output.py`).
 
@@ -172,8 +172,7 @@ curl -s "https://app.harness.io/gateway/pipeline/api/openapi.yaml" -H "x-api-key
 openapi-python-client generate --path harness-code-openapi.yaml --output-path tool/harness-code-api-client
 openapi-python-client generate --path harness-pipeline-openapi.yaml --output-path tool/harness-pipeline-api-client --config <(echo 'literal_enums: true')
 
-# Regenerate CLI (preserves custom commands: run, logs)
-cd tool/harness-cli && python generate.py
+# No CLI regeneration needed — commands are built at runtime from the SDKs
 
 # Reinstall
 cd path/to/harness-poc

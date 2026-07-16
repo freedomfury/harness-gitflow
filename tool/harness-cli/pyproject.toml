@@ -1,11 +1,15 @@
 [project]
 name = "harness-cli"
 version = "0.1.0"
-requires-python = ">=3.10"
+description = "Harness CLI — typed pass-through for Harness Code, Pipeline, and Platform APIs."
+requires-python = ">=3.11, <4.0"
 dependencies = [
     "click>=8.1,<9",
+    # The three Harness SDKs are vendored under vendor/ (see [tool.uv.sources]).
+    # They are generated packages, not on PyPI, so they must ship with the tarball.
     "api-specification-client",
     "pipeline-service-api-reference-client",
+    "harness-next-gen-software-delivery-platform-api-reference-client",
     "jq",
 ]
 
@@ -18,3 +22,14 @@ harness-cli = "harness_cli.main:cli"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# Only ship the harness_cli package in this wheel. The vendored SDKs under
+# vendor/ are built and installed as their own path dependencies (see below),
+# never bundled into the harness-cli wheel.
+[tool.hatch.build.targets.wheel]
+packages = ["harness_cli"]
+
+[tool.uv.sources]
+api-specification-client = { path = "vendor/harness-code-api-client" }
+pipeline-service-api-reference-client = { path = "vendor/harness-pipeline-api-client" }
+harness-next-gen-software-delivery-platform-api-reference-client = { path = "vendor/harness-platform-api-client" }

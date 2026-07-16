@@ -5,8 +5,12 @@ passing branch directly. This command uses the /pipeline/execute/{id} endpoint
 with Content-Type: application/yaml, which is the known working method.
 """
 
+import sys
+
 import click
 import httpx
+
+from harness_cli.output import http_error_message
 
 
 @click.command()
@@ -39,23 +43,32 @@ def run(ctx, pipeline, branch):
           spec:
             branch: {branch}"""
 
-    resp = client.post(
-        f"/pipeline/execute/{pipeline}",
-        params={
-            "accountIdentifier": account_id,
-            "orgIdentifier": org_id,
-            "projectIdentifier": project_id,
-            "moduleType": "CI",
-        },
-        content=yaml_body,
-        headers={"Content-Type": "application/yaml"},
-    )
+    try:
+        resp = client.post(
+            f"/pipeline/execute/{pipeline}",
+            params={
+                "accountIdentifier": account_id,
+                "orgIdentifier": org_id,
+                "projectIdentifier": project_id,
+                "moduleType": "CI",
+            },
+            content=yaml_body,
+            headers={"Content-Type": "application/yaml"},
+        )
+    except httpx.HTTPError as e:
+        click.echo(f"network error: {e}", err=True)
+        sys.exit(1)
 
     if resp.status_code != 200:
-        click.echo(f"HTTP {resp.status_code}: {resp.text[:500]}", err=True)
-        return
+        click.echo(http_error_message(resp), err=True)
+        sys.exit(1)
 
-    data = resp.json()
+    try:
+        data = resp.json()
+    except ValueError:
+        click.echo(http_error_message(resp), err=True)
+        sys.exit(1)
+
     execution = data.get("data", {}).get("planExecution", {})
     exec_id = execution.get("uuid", "unknown")
     status = execution.get("status", "unknown")

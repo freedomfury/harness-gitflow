@@ -40,7 +40,7 @@ Rule of thumb: if a change must affect Harness repository behavior at runtime, i
 | `docs/design.md` | **The heart.** Branch strategy, VERSION file, artifact lifecycle, ASCII flow diagrams |
 | `docs/events.md` | Event map: triggers, branch rules, what fires when |
 | `docs/cli.md` | `harness-cli` setup, common commands, `--format` filtering |
-| `docs/sdk-generation.md` | How to regenerate the SDKs and CLI from OpenAPI specs |
+| `docs/sdk-generation.md` | How to regenerate the SDKs from OpenAPI specs (CLI builds itself at runtime) |
 | `docs/lessons-learned.md` | Hard-won lessons from fighting Harness webhooks, triggers, and infra setup |
 | `docs/endpoints.md` | Raw API reference with curl examples (fallback when SDK doesn't cover) |
 | `docs/invoke-project-guide.md` | Python Invoke layout — reference for the future `imageflow` workflow layer |
@@ -70,10 +70,11 @@ dev/* push/PR → dev_build (validate) → PR to stg-* → merge → stg_merge (
 | `tool/harness-code-api-client/` | Generated Code SDK (141 endpoints) |
 | `tool/harness-pipeline-api-client/` | Generated Pipeline SDK (86 endpoints) |
 | `tool/harness-platform-api-client/` | Generated Platform (NG) SDK — large spec, only `ng-file-store` wired into the CLI |
-| `tool/harness-cli/` | Auto-generated CLI (`main.py` + command files are git-ignored/regenerated; only `run`, `logs`, `output.py`, `generate.py` are tracked) |
-| `tool/harness-cli/generate.py` | CLI generator — `python generate.py` regenerates everything |
+| `tool/harness-cli/` | Harness CLI — builds command groups dynamically at runtime from the SDKs (`main.py` and `loader.py` are tracked source; no generated files) |
+| `tool/harness-cli/harness_cli/loader.py` | Reflects over SDK signatures at import time to build Click commands; no generation step |
 | `tool/harness-cli/harness_cli/commands/logs.py` | Custom: `logs latest/find/get` |
 | `tool/harness-cli/harness_cli/commands/run.py` | Custom: `run <pipeline> --branch <branch>` |
+| `tool/harness-cli/harness_cli/commands/ng_file_store.py` | Custom: `ng-file-store` (multipart File Store ops, hand-written) |
 | `tool/Dockerfile` | Container image (`freedomfury/imageflow`) |
 | `tool/BUILD.md` | Container build/push instructions |
 
@@ -127,8 +128,7 @@ curl -s "https://app.harness.io/gateway/pipeline/api/openapi.yaml" -H "x-api-key
 openapi-python-client generate --path harness-code-openapi.yaml --output-path tool/harness-code-api-client
 openapi-python-client generate --path harness-pipeline-openapi.yaml --output-path tool/harness-pipeline-api-client --config <(echo 'literal_enums: true')
 
-# Generate CLI
-cd tool/harness-cli && python generate.py
+# No CLI generation step — commands are built at runtime from the SDKs
 
 # Install (use uv into project venv)
 uv pip install -e tool/harness-code-api-client -e tool/harness-pipeline-api-client -e tool/harness-cli
