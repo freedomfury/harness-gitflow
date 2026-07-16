@@ -1,31 +1,51 @@
 #!/usr/bin/env bash
-# Generate vendor/ — the three Harness Python SDKs — from the OpenAPI specs.
+# Generate vendor/ — the three Harness Python SDKs — from the LIVE OpenAPI specs.
 #
-# vendor/ is generated code: it is gitignored and NOT shipped in the tarball.
-# This script is the one setup step a recipient runs after unpacking:
+# Specs are downloaded from Harness each run (nothing hard-coded), so the SDKs
+# always reflect the current API. Needs:
+#   - network (also needed for openapi-python-client, fetched via uvx)
+#   - an API key: POC_HARNESS_API_KEY or HARNESS_PASSWORD_API in the env, OR in ./.env
 #
-#     ./scripts/vendor.sh          # build vendor/ from specs/
-#     cp .env.example .env         # then add your credentials
-#     uv sync                      # then install
-#
-# It runs openapi-python-client via `uvx` (no separate install; uv is already
-# required for `uv sync`). The first run fetches openapi-python-client from
-# PyPI; the Harness specs themselves ship in specs/, so NO Harness credentials
-# or network access to Harness is needed to generate.
+#     cp .env.example .env   # add your API key
+#     ./scripts/vendor.sh    # fetch specs + generate vendor/
+#     uv sync                # then install
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cli_dir="$(cd "$here/.." && pwd)"            # .../harness-cli
+cli_dir="$(cd "$here/.." && pwd)"
 vendor_dir="$cli_dir/vendor"
+specs_dir="$cli_dir/specs"   # local, gitignored; repopulated fresh each run
 
-# Specs live in specs/ alongside this folder.
-specs_dir="$cli_dir/specs"
-if [ ! -f "$specs_dir/harness-code-openapi.yaml" ]; then
-  echo "ERROR: OpenAPI specs not found in $specs_dir." >&2
-  echo "       Put harness-{code,pipeline,platform}-openapi.yaml there and re-run." >&2
+# --- resolve API key (env first, then ./.env) ---
+api_key="${POC_HARNESS_API_KEY:-${HARNESS_PASSWORD_API:-}}"
+if [ -z "$api_key" ] && [ -f "$cli_dir/.env" ]; then
+  set -a; . "$cli_dir/.env"; set +a
+  api_key="${POC_HARNESS_API_KEY:-${HARNESS_PASSWORD_API:-}}"
+fi
+if [ -z "$api_key" ]; then
+  echo "ERROR: no API key found. Set POC_HARNESS_API_KEY or HARNESS_PASSWORD_API" >&2
+  echo "       (in the env, or in $cli_dir/.env) and re-run." >&2
   exit 1
 fi
 
+# --- download the three OpenAPI specs ---
+base="https://app.harness.io/gateway"
+mkdir -p "$specs_dir"
+echo "Downloading OpenAPI specs into $specs_dir ..."
+curl -fsS -H "x-api-key: $api_key" "$base/code/openapi.yaml"         -o "$specs_dir/harness-code-openapi.yaml"
+curl -fsS -H "x-api-key: $api_key" "$base/pipeline/api/openapi.yaml" -o "$specs_dir/harness-pipeline-openapi.yaml"
+curl -fsS -H "x-api-key: $api_key" "$base/ng/api/openapi.yaml"       -o "$specs_dir/harness-platform-openapi.yaml"
+
+# Guard against a silent HTML sign-in page (bad/expired key): each spec must be YAML.
+for f in "$specs_dir"/harness-*-openapi.yaml; do
+  if ! head -1 "$f" | grep -q '^openapi:'; then
+    echo "ERROR: $f is not a valid OpenAPI spec (first line: $(head -1 "$f"))." >&2
+    echo "       Usually the API key is invalid/expired and Harness returned its sign-in page." >&2
+    exit 1
+  fi
+done
+
+# --- generate the SDKs ---
 # Pipeline spec has duplicate enum values and requires literal_enums
 # (see docs/sdk-generation.md). Code and Platform generate cleanly without it.
 config="$(mktemp)"
@@ -54,4 +74,4 @@ uvx openapi-python-client generate \
 
 echo ""
 echo "done — $(find "$vendor_dir" -name '*.py' | wc -l) python files under vendor/."
-echo "next:  cp .env.example .env  (add credentials), then  uv sync"
+echo "next:  uv sync  (and uv lock if SDK versions changed)"

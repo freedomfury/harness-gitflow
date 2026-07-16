@@ -17,7 +17,7 @@ wheels = [
 
 [[package]]
 name = "api-specification-client"
-version = "1.81.4"
+version = "1.93.3"
 source = { directory = "vendor/harness-code-api-client" }
 dependencies = [
     { name = "attrs" },

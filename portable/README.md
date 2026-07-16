@@ -11,19 +11,21 @@
 > uv run --env-file .env harness-cli repos get-branch image-build main
 > ```
 >
-> `scripts/vendor.sh` + `specs/` are included only if you ever need to
-> regenerate the SDKs.
+> To regenerate the SDKs (e.g. after a Harness API change): put your API key in
+> `.env`, then `./scripts/vendor.sh` — it downloads the OpenAPI specs fresh from
+> Harness and rebuilds `vendor/`. (Needs network + API key; `specs/` is gitignored.)
 
 A typed pass-through CLI for the Harness Code, Pipeline, and Platform APIs.
 Command groups are built dynamically at import time by reflecting over the
 installed SDKs — there is no code-generation step. A few hand-written
 commands (`run`, `logs`, `ng-file-store`) are layered on top.
 
-This directory is a **self-contained, standalone project**: it ships the
-OpenAPI specs for the three Harness APIs plus a generator script, pins a full
-dependency graph in `uv.lock`, and can be tarballed and regenerated anywhere
-`uv` + Python 3.12 are available. The generated SDKs (`vendor/`) are produced
-locally by `scripts/vendor.sh` — they are not committed and not shipped.
+This directory is a **self-contained, standalone project**: `scripts/vendor.sh`
+downloads the OpenAPI specs for the three Harness APIs from Harness itself and
+generates the SDKs, and `uv.lock` pins a full dependency graph. It runs
+anywhere `uv` + Python 3.11+ are available. The generated SDKs (`vendor/`) and
+the fetched specs (`specs/`) are produced locally by `scripts/vendor.sh` — they
+are not committed and not shipped.
 
 > **No credentials ship with this project.** The CLI reads credentials only
 > from environment variables at runtime and writes nothing to disk. Every
@@ -57,7 +59,7 @@ locally by `scripts/vendor.sh` — they are not committed and not shipped.
 
 ```bash
 cd portable                # this folder (vendor/ is already generated)
-./scripts/vendor.sh        # optional — only needed to regenerate the SDKs
+./scripts/vendor.sh        # optional — regenerate SDKs (downloads specs; needs API key in .env + network)
 uv sync                    # creates .venv, installs CLI + generated SDKs from uv.lock
 uv run harness-cli --help  # works with no credentials — --help never calls the API
 ```
@@ -71,20 +73,20 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ## Unpackaging the tarball
 
 The distributable archive is a small gzipped tarball (`harness-cli.tar.gz`)
-that ships the **specs** (not the generated SDKs). Setup is: unpack, generate
-the SDKs, add credentials.
+containing the CLI source + `scripts/vendor.sh` (no specs, no SDKs — both are
+produced locally). Setup is: unpack, add credentials, generate the SDKs.
 
 ```bash
 # 1. Unpack anywhere
 tar -xzf harness-cli.tar.gz
 cd harness-cli
 
-# 2. Generate the SDKs from the shipped specs (one-time). Needs network on the
-#    first run only — to fetch openapi-python-client, NOT the Harness specs or creds.
-./scripts/vendor.sh
-
-# 3. Add credentials (see "Credentials" below) — e.g. via the .env template
+# 2. Add credentials FIRST — vendor.sh needs the API key to download the specs
 cp .env.example .env        # then edit .env and replace the <...> placeholders
+
+# 3. Generate the SDKs: downloads the specs from Harness + runs openapi-python-client.
+#    Needs network + the API key from .env.
+./scripts/vendor.sh
 
 # 4. Install + run
 uv sync
@@ -323,13 +325,13 @@ outside this project) keeps complex payloads readable and versionable.
 ## What's vendored
 
 The three Harness SDK packages are generated from OpenAPI specs and are **not
-on PyPI**. Rather than ship the generated code (it's ~25 MB and regenerates
-trivially), the package ships the **specs** (`specs/`) plus a generator
-(`scripts/vendor.sh`). `vendor/` itself is gitignored and excluded from the
-tarball; the recipient (or developer) generates it locally:
+on PyPI**. Neither the generated code nor the specs are committed —
+`scripts/vendor.sh` downloads the specs fresh from Harness each run and
+generates the SDKs. Both `vendor/` and `specs/` are gitignored and excluded
+from the tarball; the recipient (or developer) produces them locally:
 
 ```bash
-./scripts/vendor.sh        # openapi-python-client (via uvx) → vendor/
+./scripts/vendor.sh        # download specs from Harness + generate vendor/ (via uvx)
 ```
 
 The generated dirs and their import packages:
@@ -356,12 +358,12 @@ versions changed, then `uv sync`.
 ./package.sh /tmp/out.tar.gz  # custom output path
 ```
 
-The tarball ships the CLI source, `specs/`, `scripts/`, `pyproject.toml`,
+The tarball ships the CLI source, `scripts/`, `pyproject.toml`,
 `uv.lock`, `.python-version`, and `.env.example`. It **excludes** `vendor/`
-(the recipient regenerates it via `scripts/vendor.sh`) plus all
-dynamic/generated artifacts:
+and `specs/` (the recipient fetches specs + regenerates `vendor/` via
+`scripts/vendor.sh`) plus all dynamic/generated artifacts:
 
-- `vendor/` — generated SDKs (rebuilt locally by the recipient)
+- `vendor/`, `specs/` — generated/fetched locally by `scripts/vendor.sh`
 - `__pycache__/`, `*.pyc` — Python bytecode
 - `.venv/`, `venv/` — virtual environments (each user creates their own via `uv sync`)
 - `*.egg-info/`, `build/`, `dist/` — build metadata
@@ -369,8 +371,8 @@ dynamic/generated artifacts:
 - `.ruff_cache/` — linter cache
 - `.env` — real credentials (only the `.env.example` template ships)
 
-`uv.lock` and `specs/` **are** shipped — together they fully reproduce the
-environment. No credential material of any kind is included or generated.
+`uv.lock` **is** shipped — it fully reproduces the environment once `vendor/`
+is generated. No credential material of any kind is included.
 
 ---
 
@@ -390,9 +392,9 @@ harness-cli/
 │   ├── config.py         #   env-based credential resolution + client factory
 │   ├── output.py         #   JSON rendering + jq formatting
 │   └── commands/         #   hand-written: run.py, logs.py, ng_file_store.py
-├── specs/                # OpenAPI specs (shipped) — input to vendor.sh
+├── specs/                # OpenAPI specs (gitignored; fetched from Harness by vendor.sh)
 ├── scripts/
-│   └── vendor.sh         # regenerate vendor/ from specs/ via openapi-python-client
+│   └── vendor.sh         # fetch specs from Harness + generate vendor/ (via openapi-python-client)
 ├── vendor/               # generated SDKs (gitignored, not shipped; built by vendor.sh)
 └── tests/                # CLI test suite (uv sync --extra dev → pytest)
 ```
