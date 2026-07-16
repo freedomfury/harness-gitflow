@@ -1,0 +1,36 @@
+# Python bytecode & caches (regenerated on import/build — never ship)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Test caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments — each user creates their own via `uv sync`.
+# uv.lock (tracked) fully reproduces the environment; .venv is disposable.
+.venv/
+venv/
+env/
+
+# Build artifacts
+build/
+dist/
+
+# Vendored SDKs — generated from specs/ via scripts/vendor.sh (not committed,
+# not shipped in the tarball; the recipient regenerates them locally).
+vendor/
+
+# Editor / OS cruft
+.DS_Store
+.idea/
+.vscode/
+
+# Credentials / local secrets — real API keys live here, NEVER commit.
+# (.env is loaded via `uv run --env-file .env`; also excluded from the tarball.)
+.env
+.env.*
+# .env.example is the safe, committable template — it DOES ship in the tarball
+!.env.example
